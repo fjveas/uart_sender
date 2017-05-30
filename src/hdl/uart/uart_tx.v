@@ -25,6 +25,14 @@ module uart_tx
 
 	reg [1:0] state = TX_IDLE, state_next;
 	reg [2:0] counter = 3'd0, counter_next;
+	reg [7:0] tx_data_reg;
+
+	always @(posedge clk) begin
+		if (reset)
+			tx_data_reg <= 'd0;
+		else if (state == TX_IDLE && tx_start)
+			tx_data_reg <= tx_data;
+	end
 
 	always @(*) begin
 		tx = 1'b1;
@@ -35,22 +43,26 @@ module uart_tx
 		case (state)
 		TX_IDLE: begin
 			tx_busy = 1'b0;
-			state_next = (tx_start) ? TX_START : TX_IDLE;
+			if (tx_start)
+				state_next = TX_START;
 		end
 		TX_START: begin
 			tx = 1'b0;
-			state_next = (baud_tick) ? TX_SEND : TX_START;
 			counter_next = 'd0;
+			if (baud_tick)
+				state_next = TX_SEND;
 		end
 		TX_SEND: begin
-			tx = tx_data[counter];
+			tx = tx_data_reg[counter];
 			if (baud_tick) begin
-				state_next = (counter == 'd7) ? TX_STOP : TX_SEND;
 				counter_next = counter + 'd1;
+				if (counter == 'd7)
+					state_next = TX_STOP;
 			end
 		end
 		TX_STOP:
-			state_next = (baud_tick) ? TX_IDLE : TX_STOP;
+			if (baud_tick)
+				state_next = TX_IDLE;
 		endcase
 	end
 
